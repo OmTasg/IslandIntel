@@ -2,19 +2,18 @@ name: IslandIntel Multi-Region Fetch
 
 on:
   schedule:
-    # 10:00 UTC (6:00 AM EDT) - The Global Trough / EU Morning
     - cron: '0 10 * * *'
-    # 16:00 UTC (12:00 PM EDT) - The Lunch Hour / Mid-day Peak
     - cron: '0 16 * * *'
-    # 20:00 UTC (4:00 PM EDT) - The Golden Hour (US/EU Player Overlap)
     - cron: '0 20 * * *'
-    # 02:00 UTC (10:00 PM EDT) - The Late Night / Asia Peak
     - cron: '0 2 * * *'
-  workflow_dispatch: # Allows you to trigger it manually
+  workflow_dispatch: 
 
 jobs:
   run-data-pipeline:
     runs-on: ubuntu-latest
+    
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout the code

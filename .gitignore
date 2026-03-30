@@ -14,7 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# Python local lib only (do not use bare `lib/` — it ignores frontend helpers like web/src/lib)
+/lib/
 lib64/
 parts/
 sdist/
