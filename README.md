@@ -1,159 +1,47 @@
 # IslandIntel (Fortnite Creative Analytics)
 
-IslandIntel is a full-stack analytics + BI dashboard for Fortnite Creative (UEFN). It combines:
+IslandIntel is a full-stack analytics platform tracking the Fortnite Creative (UEFN) ecosystem. It features an automated data ingestion pipeline, a cloud-hosted PostgreSQL database, and a custom React front-end to visualize market share, map viability, and player retention.
 
-- A **data ingestion pipeline** (Python) that pulls per-map metrics and appends them into Supabase/Postgres tables.
-- A lightweight **Node/Express API** that serves the latest metrics to the frontend.
-- A **React/Recharts dashboard** that visualizes retention, engagement, and market share—plus a dedicated **Maps** page to inspect all tracked islands.
+## The Data Lifecycle
 
-## Origin (Tableau -> Web)
+This project was built in two distinct phases to mirror professional BI workflows:
 
-The plots in this project were first modeled in Tableau, and then (with help from Cursor) translated into a full website implementation using React, Recharts, and an API-backed data flow.
+1. **Exploratory Data Analysis (Tableau):** Before writing the front-end code, I connected the raw database to Tableau Desktop to test logarithmic scales, model the plots, and identify the highest-signal visualizations. [View the Tableau Prototype Here](https://public.tableau.com/views/IslandIntel_tableau/Dashboard8?:language=en-US&publish=yes&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link).
+2. **Full-Stack Application (React + Recharts):** Because standard BI tools struggle with zero-latency web connections, I used Cursor to translate the Tableau wireframes into a custom React application, computing statistical metrics client-side and rendering SVG charts natively with Recharts.
 
-- Tableau Public reference dashboard: [IslandIntel on Tableau Public](https://public.tableau.com/views/IslandIntel_tableau/Dashboard8?:language=en-US&publish=yes&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link)
+## Architecture & Automation
 
-## What you get
+This project relies on a modern, fully automated ETL pipeline:
 
-- **Command dashboard** (charts): Engagement + Viability scatter plots, Genre viability, Session frequency, and Market share treemap.
-- **Maps page**: searchable list/table of all maps (name, code, genre, peak players, D1/D7 retention, avg playtime).
-- **Zoom/pan** interaction on the scatter visualizations (Tableau-style axis zoom).
-- **Hover tooltips** showing map identity (map name + code) and key metrics.
+* **Automated Ingestion (GitHub Actions):** A Python script (`pythonextractor.py`) is scheduled via GitHub Actions cron jobs to run automatically. It fetches live, map-level telemetry from Epic Games' ecosystem metrics endpoint.
+* **Cloud Database (Supabase / PostgreSQL):** The extracted data is cleaned, typed, and pushed to a cloud-hosted PostgreSQL data warehouse managed by Supabase. This allows for reliable, scalable time-series storage.
+* **Serving Layer (Node/Express):** A lightweight API (`/api/map-stats`) performs relational SQL joins between the `map_stats` and `map_info` tables, serving clean, formatted JSON arrays directly to the React front-end.
 
-## Architecture
+## Features
 
-1. **Python ingestion**
-   - Uses `pythonextractor.py` to:
-     - Read map metadata from `map_info`.
-     - Fetch live metrics from Epic’s ecosystem metrics endpoint for each `island_code`.
-     - Append results into `map_stats`.
-2. **Node API**
-   - `web/server/mapStatsServer.mjs` exposes `GET /api/map-stats`
-   - It performs a SQL join between `map_stats` and `map_info` to provide the frontend with `map_name` + `genre` alongside the numeric metrics.
-3. **Frontend**
-   - `web/` (Vite + React) renders:
-     - `#command` → `Dashboard.jsx`
-     - `#maps` → `MapsPage.jsx`
-     - `#settings` → `SettingsPage.jsx`
-     - `#about` → `AboutPage.jsx`
+- **The Command Center:** Interactive scatter plots (Log-scale Viability & Engagement), categorized Box-and-Whisker genre viability, and a Market Share treemap.
+- **Interactive Recharts:** Full support for highlight-to-zoom, panning, and custom data tooltips.
+- **Map Directory:** A searchable data table indexing all tracked maps by peak concurrency, average playtime, and Day 1 / Day 7 retention.
 
-## Data pipeline (ETL + analytics semantics)
+## Database Schema
 
-IslandIntel follows a practical ETL pattern tuned for product analytics:
+This project expects two tables in your Supabase PostgreSQL instance:
 
-### Extract
+**1. `map_info` (Dimension Table)**
+Stores the curated universe of tracked islands.
+* `island_code` (PK, text)
+* `map_name` (text)
+* `genre` (text)
 
-- **Source systems**
-  - Epic ecosystem metrics endpoint (map-level telemetry)
-  - Curated island metadata (`map_info`) seeded from discovery/scrape workflows (e.g. `fortmpascrape2.py`)
-- **Entity key**
-  - `island_code` is the canonical join key across metadata and metrics.
+**2. `map_stats` (Time-Series Fact Table)**
+Stores the append-only metric snapshots.
+* `island_code` (FK, text)
+* `captured_at` (timestamp)
+* `avg_playtime_mins`, `players_peak`, `favorites` (numeric)
+* `retention_d1`, `retention_d7` (numeric, 0..1)
+* `total_unique_plays`, `total_unique_players` (numeric)
 
-### Transform
-
-- **Schema harmonization**
-  - Raw API payloads are normalized into typed numeric fields:
-    - engagement: `avg_playtime_mins`, `total_playtime_mins`
-    - concurrency: `players_peak`
-    - retention: `retention_d1`, `retention_d7`
-    - demand/activity: `favorites`, `total_unique_plays`, `total_unique_players`
-- **Data quality handling**
-  - Defensive extraction logic converts nested/missing payload patterns into stable numeric outputs.
-  - Null/invalid values are coerced to safe defaults where appropriate for downstream charting.
-- **Feature engineering (dashboard model layer)**
-  - `sessions_per_player` proxy from `total_unique_plays / total_unique_players`
-  - deterministic jitter for categorical scatter separation
-  - latest-observation rollups per map for point-in-time comparisons
-  - genre-level aggregations and market-share composition.
-
-### Load
-
-- **Storage target**
-  - `map_stats` (append-only snapshots; temporal fact table at map-time grain)
-  - `map_info` (slow-changing map dimension attributes: `map_name`, `genre`)
-- **Serving layer**
-  - Node API (`/api/map-stats`) performs a relational join and returns analysis-ready records to the frontend.
-
-### Analytical framing
-
-- **Observation grain**
-  - Core fact grain is `(island_code, captured_at)` with map-level metrics.
-- **Time handling**
-  - Dashboards use bucketed temporal aggregations for trend views and latest-snapshot views for cross-sectional comparisons.
-- **Distribution-aware visualization**
-  - Log scaling is used where heavy-tail effects/outliers dominate (`players_peak` distributions).
-- **Retention interpretation**
-  - D1 and D7 are treated as short- and mid-term stickiness signals; combined with playtime and concurrency to infer map health.
-
-In short: this is not just chart rendering; it is a compact analytics stack with ETL, dimensional joins, engineered features, and BI-style exploratory views.
-
-## Required database tables
-
-This project expects (at minimum) two tables in Postgres/Supabase:
-
-### `map_info`
-Stores the curated universe of islands you want to analyze.
-
-- `island_code` (text) — unique identifier (e.g. `1234-5678-9012`)
-- `map_name` (text)
-- `genre` (text)
-
-### `map_stats`
-Stores time-series metric snapshots per island.
-
-- `island_code` (text)
-- `captured_at` (timestamp/date)
-- `avg_playtime_mins` (numeric)
-- `players_peak` (numeric)
-- `favorites` (numeric)
-- `total_playtime_mins` (numeric)
-- `retention_d1` (numeric, 0..1)
-- `retention_d7` (numeric, 0..1)
-- `total_unique_plays` (numeric)
-- `total_unique_players` (numeric)
-
-The API (`/api/map-stats`) currently fetches the latest rows ordered by `captured_at` and uses a join on `island_code` to attach `map_name` + `genre`.
-
-## Environment variables
-
-### Python ingestion (`./.env`)
-
-`pythonextractor.py` loads `./.env` and uses:
-
-- `SUPABASE_DB_URL` **or** `SUPABASE_URL`
-  - PostgreSQL connection string used by SQLAlchemy.
-
-Example (no real secrets in this README):
-
-```env
-SUPABASE_DB_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME
-```
-
-### Node API + React frontend (`./web/.env`)
-
-`web/server/mapStatsServer.mjs` loads `web/.env` and reads:
-
-- `DATABASE_URL` (required)
-- `MAP_STATS_API_PORT` (optional, default: `3456`)
-- `MAP_STATS_ROW_LIMIT` (optional, default: `8000`)
-- `MAP_STATS_TABLE` (optional, default: `map_stats`)
-- `MAP_INFO_TABLE` (optional, default: `map_info`)
-- `DATABASE_SSL` (optional; if not `false`, SSL is enabled for known hosts)
-
-The frontend also uses:
-
-- `VITE_DATABASE_API=true|false`
-  - When `true`, the dashboard uses the Node API (`/api/map-stats`).
-
-Example:
-
-```env
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME
-VITE_DATABASE_API=true
-MAP_STATS_API_PORT=3456
-MAP_STATS_ROW_LIMIT=8000
-```
-
-## Local setup
+## Local Setup
 
 ### 1) (Optional) Ingest/refresh metrics (Python)
 
