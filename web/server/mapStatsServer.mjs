@@ -98,6 +98,11 @@ app.get('/api/map-stats', async (_req, res) => {
   }
 })
 
-app.listen(PORT, () => {
-  console.log(`[IslandIntel] map stats API at http://127.0.0.1:${PORT}`)
-})
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.MAP_STATS_API_PORT || 3456;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+export default app;
