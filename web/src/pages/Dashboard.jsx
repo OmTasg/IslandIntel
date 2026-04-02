@@ -153,8 +153,8 @@ export function Dashboard({ settings }) {
         <ChartCard
           className="xl:col-span-2"
           title="Market share distribution"
-          subtitle="Treemap of summed peak players in the latest capture hour, by genre"
-          description="A hierarchical visual utilizing proportional area to represent the sum of total players captured by each genre within the ecosystem."
+          subtitle="Treemap of summed total playtime minutes in the latest capture hour, by genre"
+          description="A hierarchical visual utilizing proportional area to represent the sum of total playtime minutes captured by each genre within the ecosystem."
           whyItMatters="It provides an instant, high-level executive summary of market dominance. It clearly visualizes the massive footprint of &quot;Tycoon&quot; and &quot;1v1&quot; maps, allowing analysts to quickly gauge whether an emerging genre is actually capturing significant overall market share or just operating in a small niche."
         >
           <ChartBody loading={loading} height={340} enableZoom={false}>

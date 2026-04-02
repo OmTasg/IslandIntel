@@ -76,7 +76,7 @@ function TreemapGenreTooltip({ active, payload }) {
     >
       <p className="font-semibold text-slate-100">{row.name ?? 'Genre'}</p>
       <p className="mt-1 text-slate-300">
-        Peak players:{' '}
+        Total playtime mins:{' '}
         <span className="font-medium text-slate-100">
           {Number(row.size ?? 0).toLocaleString()}
         </span>

@@ -191,7 +191,7 @@ export function rowsToChartModel(rows) {
   const shareByGenre = new Map()
   for (const r of inLatestHour) {
     const g = mapGenre(r)
-    shareByGenre.set(g, (shareByGenre.get(g) ?? 0) + (Number(r.players_peak) || 0))
+    shareByGenre.set(g, (shareByGenre.get(g) ?? 0) + (Number(r.total_playtime_mins) || 0))
   }
   const marketShareTreemap = [...shareByGenre.entries()].map(([name, size]) => ({
     name,
